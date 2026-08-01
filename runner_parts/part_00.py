@@ -98,6 +98,9 @@ CFG = {
     "n_visual_examples": 6,
 }
 
+# The one-cell notebook may define GLAUCOMMA_OVERRIDES before executing this runner.
+CFG.update(globals().get("GLAUCOMMA_OVERRIDES", {}))
+
 if CFG["fast_dev_run"]:
     CFG.update({"epochs": 2, "patience": 2, "batch_size": 4, "run_optuna": False})
 
