@@ -19,7 +19,7 @@ jobs:
           python - <<'PY'
           from pathlib import Path
 
-          original = ''.join(Path(f'runner_parts/part_{i:02d}.py').read_text() for i in range(8))
+          original = '\n'.join(Path(f'runner_parts/part_{i:02d}.py').read_text() for i in range(8))
           patch_ns = {}
           patch_source = Path('runner_patch_v2.py').read_text()
           exec(compile(patch_source, 'runner_patch_v2.py', 'exec'), patch_ns, patch_ns)
@@ -52,6 +52,7 @@ jobs:
           assert nb['cells'][0]['cell_type'] == 'code'
           source = ''.join(nb['cells'][0]['source'])
           assert "COMMIT = 'b518431d60b60b2764886ad6d439284f54ebd57d'" in source
+          assert "code = '\\n'.join" in source
           assert "patch_ns['apply_patches'](code)" in source
           assert "'run_name': 'paper_run_v2'" in source
           print('Notebook is valid, single-cell, resumable, and pinned to the immutable v2 runner.')
