@@ -29,7 +29,7 @@ TABLES = load_tables(DATA_ROOT)
 
 def build_label_index(tables):
     idx = {}
-    file_candidates = ["image", "filename", "file", "img", "name", "image_name", "imageid", "id"]
+    file_candidates = ["image", "filename", "file", "img", "imgname", "img_name", "name", "image_name", "imageid", "id"]
     label_candidates = ["glaucoma", "label", "class", "diagnosis", "target", "binary", "binarylabels", "binary_labels", "is_glaucoma", "glaucoma_label"]
     for path, df in tables:
         lower = {re.sub(r"[^a-z0-9]+", "_", str(c).lower()).strip("_"): c for c in df.columns}
@@ -105,15 +105,17 @@ def discover_metadata(root):
         if src not in CFG["sources"]: continue
         y = LABEL_INDEX.get((src, norm_key(p)), LABEL_INDEX.get((None, norm_key(p)), np.nan))
         if pd.isna(y): y = folder_label(p)
+        parts_lower = [q.lower() for q in p.parts]
+        repr_rank = 0 if "images" in parts_lower else (1 if "images_square" in parts_lower else (2 if "images_cropped" in parts_lower else 3))
         rows.append({
             "image_path": str(p), "mask_path": choose_mask(src, p),
             "source": src, "label": y, "is_cropped": int("cropped" in str(p).lower()),
-            "image_key": norm_key(p)
+            "representation_rank": repr_rank, "image_key": norm_key(p)
         })
     meta = pd.DataFrame(rows)
     if meta.empty: raise RuntimeError(f"No images found under {root}")
     # Prefer uncropped version per source/key; retain cropped only when no original exists.
-    meta = meta.sort_values(["source", "image_key", "is_cropped"]).drop_duplicates(["source", "image_key"], keep="first")
+    meta = meta.sort_values(["source", "image_key", "representation_rank", "is_cropped"]).drop_duplicates(["source", "image_key"], keep="first")
     unresolved = meta["label"].isna()
     if unresolved.any():
         sample = meta.loc[unresolved, ["source", "image_path"]].head(20)
