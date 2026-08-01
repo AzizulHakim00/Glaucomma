@@ -17,7 +17,7 @@ jobs:
         run: |
           cat runner_parts/part_*.py > /tmp/rimgraph_dg_single_cell.py
           python -m py_compile /tmp/rimgraph_dg_single_cell.py
-          echo "8afb0f74d8d4af59137ca6a0bc35eab2c5addf61d2f93909354dfbb7763a5d7e  /tmp/rimgraph_dg_single_cell.py" | sha256sum --check
+          echo "a27b0c7caa15835f1f2b96e5f53be4fc1679ce7979309fa6f73076b0917d4ebe  /tmp/rimgraph_dg_single_cell.py" | sha256sum --check
       - name: Validate notebook shape
         run: |
           python - <<'PY'
