@@ -1,5 +1,7 @@
 # Glaucomma — RimGraph-DG
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/AzizulHakim00/Glaucomma/blob/main/Glaucomma_RimGraphDG_Single_Cell.ipynb)
+
 A reproducible Google Colab research pipeline for source-independent glaucoma screening using ORIGA, REFUGE, and G1020.
 
 ## Main design
@@ -19,7 +21,7 @@ A reproducible Google Colab research pipeline for source-independent glaucoma sc
 
 ## Run in Colab
 
-Open `Glaucomma_RimGraphDG_Single_Cell.ipynb`, select a GPU runtime, and run its only cell.
+Click the **Open in Colab** badge above, select a GPU runtime, and run the notebook's only cell.
 
 The cell automatically:
 
@@ -61,6 +63,8 @@ At the top of the runner:
 ## Reproducibility and leakage control
 
 The held-out source is not used for fitting, early stopping, hyperparameter selection, threshold selection or temperature scaling. All split CSVs, effective hyperparameters, checkpoints, environment details and checksums are retained.
+
+The notebook is pinned to an immutable runner commit and verifies the reconstructed runner with SHA-256 before execution. GitHub Actions also checks that the runner compiles and that the notebook contains exactly one code cell.
 
 ## Status
 
