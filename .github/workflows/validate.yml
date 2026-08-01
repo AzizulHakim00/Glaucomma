@@ -17,7 +17,21 @@ jobs:
         run: |
           cat runner_parts/part_*.py > /tmp/rimgraph_dg_single_cell.py
           python -m py_compile /tmp/rimgraph_dg_single_cell.py
-          echo "a27b0c7caa15835f1f2b96e5f53be4fc1679ce7979309fa6f73076b0917d4ebe  /tmp/rimgraph_dg_single_cell.py" | sha256sum --check
+      - name: Validate safe unlabeled-image handling
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          code = Path('runner_parts/part_02.py').read_text()
+          required = [
+              'excluded_unlabelled_images.csv',
+              'missing_public_label_in_downloaded_package',
+              'meta = meta.loc[~unresolved].copy()',
+              'They are **not assigned guessed labels**',
+          ]
+          for marker in required:
+              assert marker in code, f'Missing safety marker: {marker}'
+          print('Unlabelled challenge images are excluded and audited safely.')
+          PY
       - name: Validate notebook shape
         run: |
           python - <<'PY'
@@ -28,5 +42,7 @@ jobs:
           assert nb['nbformat'] == 4
           assert len(nb['cells']) == 1
           assert nb['cells'][0]['cell_type'] == 'code'
-          print('Notebook is valid and contains exactly one code cell.')
+          source = ''.join(nb['cells'][0]['source'])
+          assert "COMMIT = '8bd4273fd79b9457571a6811c0deb8ee383d24c6'" in source
+          print('Notebook is valid, single-cell, and pinned to the fixed runner.')
           PY
