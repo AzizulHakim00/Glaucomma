@@ -69,6 +69,13 @@ def folder_label(path):
         if re.fullmatch(r"n\d+", stem): return 0
     return np.nan
 
+def infer_dataset_split(path):
+    parts = [str(x).lower() for x in Path(path).parts]
+    if any(x in {"train", "training"} for x in parts): return "train"
+    if any(x in {"validation", "valid", "val", "offline-validation", "offline_validation"} for x in parts): return "validation"
+    if any(x in {"test", "testing", "onsite-test", "onsite_test"} for x in parts): return "test"
+    return "unspecified"
+
 def build_mask_index(root):
     masks = {}
     for p in root.rglob("*"):
@@ -104,39 +111,89 @@ def discover_metadata(root):
         src = infer_source(p)
         if src not in CFG["sources"]: continue
         y = LABEL_INDEX.get((src, norm_key(p)), LABEL_INDEX.get((None, norm_key(p)), np.nan))
-        if pd.isna(y): y = folder_label(p)
+        label_origin = "annotation_table" if not pd.isna(y) else "unresolved"
+        if pd.isna(y):
+            y = folder_label(p)
+            if not pd.isna(y): label_origin = "folder_or_filename"
         parts_lower = [q.lower() for q in p.parts]
         repr_rank = 0 if "images" in parts_lower else (1 if "images_square" in parts_lower else (2 if "images_cropped" in parts_lower else 3))
         rows.append({
             "image_path": str(p), "mask_path": choose_mask(src, p),
-            "source": src, "label": y, "is_cropped": int("cropped" in str(p).lower()),
+            "source": src, "dataset_split": infer_dataset_split(p),
+            "label": y, "label_origin": label_origin,
+            "is_cropped": int("cropped" in str(p).lower()),
             "representation_rank": repr_rank, "image_key": norm_key(p)
         })
     meta = pd.DataFrame(rows)
     if meta.empty: raise RuntimeError(f"No images found under {root}")
+
     # Prefer uncropped version per source/key; retain cropped only when no original exists.
     meta = meta.sort_values(["source", "image_key", "representation_rank", "is_cropped"]).drop_duplicates(["source", "image_key"], keep="first")
+    STORE.save_df(meta, "metadata_all_discovered.csv")
+
     unresolved = meta["label"].isna()
-    if unresolved.any():
-        sample = meta.loc[unresolved, ["source", "image_path"]].head(20)
-        display(Markdown("### Unresolved labels (sample)")); display(sample)
+    excluded = meta.loc[unresolved].copy()
+    if not excluded.empty:
+        excluded["exclusion_reason"] = "missing_public_label_in_downloaded_package"
+        STORE.save_df(excluded, "excluded_unlabelled_images.csv")
+        excluded_summary = (
+            excluded.groupby(["source", "dataset_split"]).size()
+            .rename("Excluded unlabeled").reset_index()
+        )
+        display(Markdown(
+            "### Unlabelled images excluded safely\n"
+            "The downloaded package contains images without accessible glaucoma labels. "
+            "They are **not assigned guessed labels** and are excluded from supervised training, "
+            "validation, calibration, and testing to prevent invalid results or leakage."
+        ))
+        display(excluded_summary)
+        display(Markdown("A complete list was saved as `excluded_unlabelled_images.csv` in both Colab and Drive outputs."))
+
+    meta = meta.loc[~unresolved].copy()
+    if meta.empty:
         raise RuntimeError(
-            f"Could not infer labels for {unresolved.sum()} images. "
-            "Set CFG['manual_data_dir'] to a folder containing the original CSV label files, "
-            "or add a CSV with image/label columns."
+            "No labelled images remain after safely excluding images without public labels. "
+            "Provide a verified annotation file through CFG['manual_data_dir']."
         )
     meta["label"] = meta["label"].astype(int)
-    # Remove exact duplicate paths/keys.
     meta = meta.drop_duplicates(["source", "image_path"]).reset_index(drop=True)
-    return meta
 
-META = discover_metadata(DATA_ROOT)
+    # Scientific validity check: every configured source used in a binary fold must contain both classes.
+    invalid_sources = []
+    for src in CFG["sources"]:
+        src_labels = sorted(meta.loc[meta["source"] == src, "label"].unique().tolist())
+        if src_labels != [0, 1]:
+            invalid_sources.append((src, src_labels, int((meta["source"] == src).sum())))
+    if invalid_sources:
+        details = "; ".join(f"{s}: labels={labs}, n={n}" for s, labs, n in invalid_sources)
+        raise RuntimeError(
+            "At least one configured source does not contain both verified classes after filtering: "
+            f"{details}. Add verified labels or remove that source from CFG['sources']/CFG['fold_targets']."
+        )
+    return meta, excluded
+
+META, EXCLUDED_UNLABELLED = discover_metadata(DATA_ROOT)
 STORE.save_df(META, "metadata.csv")
 
 section("Dataset audit")
 audit = META.groupby(["source", "label"]).size().unstack(fill_value=0).rename(columns={0: "Normal", 1: "Glaucoma"})
-audit["Total"] = audit.sum(axis=1)
+for col in ["Normal", "Glaucoma"]:
+    if col not in audit.columns: audit[col] = 0
+audit["Total labelled"] = audit["Normal"] + audit["Glaucoma"]
 audit["With mask"] = META.groupby("source")["mask_path"].apply(lambda x: x.notna().sum())
+if not EXCLUDED_UNLABELLED.empty:
+    excluded_counts = EXCLUDED_UNLABELLED.groupby("source").size()
+    audit["Excluded unlabeled"] = excluded_counts.reindex(audit.index, fill_value=0)
+else:
+    audit["Excluded unlabeled"] = 0
+audit = audit[["Normal", "Glaucoma", "Total labelled", "With mask", "Excluded unlabeled"]]
 display(audit)
+
+audit_split = META.groupby(["source", "dataset_split", "label"]).size().unstack(fill_value=0).rename(columns={0: "Normal", 1: "Glaucoma"})
+for col in ["Normal", "Glaucoma"]:
+    if col not in audit_split.columns: audit_split[col] = 0
+audit_split["Total labelled"] = audit_split["Normal"] + audit_split["Glaucoma"]
+display(Markdown("### Labelled images by original package split"))
+display(audit_split.reset_index())
 
 # ---------------------------- 7. IMAGE + MASK UTILITIES ----------------------------
