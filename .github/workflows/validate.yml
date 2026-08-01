@@ -2,7 +2,7 @@ name: Validate single-cell runner
 
 on:
   push:
-    branches: [main, fix/colab-runner-v2]
+    branches: [main, fix/runtime-smoke-v3]
   pull_request:
 
 jobs:
@@ -20,24 +20,27 @@ jobs:
           from pathlib import Path
 
           original = '\n'.join(Path(f'runner_parts/part_{i:02d}.py').read_text() for i in range(8))
-          patch_ns = {}
-          patch_source = Path('runner_patch_v2.py').read_text()
-          exec(compile(patch_source, 'runner_patch_v2.py', 'exec'), patch_ns, patch_ns)
-          patched = patch_ns['apply_patches'](original)
-          compile(patched, 'rimgraph_dg_single_cell_v2.py', 'exec')
-          Path('/tmp/rimgraph_dg_single_cell_v2.py').write_text(patched)
+          ns_v2, ns_v3 = {}, {}
+          exec(compile(Path('runner_patch_v2.py').read_text(), 'runner_patch_v2.py', 'exec'), ns_v2, ns_v2)
+          exec(compile(Path('runner_patch_v3.py').read_text(), 'runner_patch_v3.py', 'exec'), ns_v3, ns_v3)
+          patched = ns_v2['apply_patches'](original)
+          patched = ns_v3['apply_patches_v3'](patched)
+          compile(patched, 'rimgraph_dg_single_cell_v3.py', 'exec')
 
           required = [
               'excluded_unlabelled_images.csv',
               'missing_public_label_in_downloaded_package',
               'weights_only=False',
               'GPU runtime is required',
-              'completed_mode == bool(CFG["fast_dev_run"])',
+              'completed_revision == CFG.get("code_revision")',
+              'saved_revision == current_revision',
+              'torch.set_grad_enabled(train)',
+              'l_cons_raw*b["mask_valid"]',
               'improved = score > best_score',
           ]
           for marker in required:
               assert marker in patched, f'Missing patched safety marker: {marker}'
-          print('Patched runner compiled and all safety markers were found.')
+          print('V3 patched runner compiled and all runtime safety markers were found.')
           PY
 
       - name: Validate notebook shape and immutable pin
@@ -51,9 +54,12 @@ jobs:
           assert len(nb['cells']) == 1
           assert nb['cells'][0]['cell_type'] == 'code'
           source = ''.join(nb['cells'][0]['source'])
-          assert "COMMIT = 'b518431d60b60b2764886ad6d439284f54ebd57d'" in source
+          assert "COMMIT = 'a2621ca580f1974b13ebb904f420f97f5461f50b'" in source
           assert "code = '\\n'.join" in source
-          assert "patch_ns['apply_patches'](code)" in source
-          assert "'run_name': 'paper_run_v2'" in source
-          print('Notebook is valid, single-cell, resumable, and pinned to the immutable v2 runner.')
+          assert "apply_patches_v3" in source
+          assert "'run_name': 'paper_run_v3'" in source
+          assert "'code_revision': 'rimgrah-dg-runtime-v3-20260802'" in source
+          assert "'batch_size': 2" in source
+          assert "'num_workers': 0" in source
+          print('Notebook is valid, single-cell, safer for T4, and pinned to immutable v3 code.')
           PY
