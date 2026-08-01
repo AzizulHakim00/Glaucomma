@@ -1,0 +1,32 @@
+name: Validate single-cell runner
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Reconstruct and syntax-check runner
+        run: |
+          cat runner_parts/part_*.py > /tmp/rimgraph_dg_single_cell.py
+          python -m py_compile /tmp/rimgraph_dg_single_cell.py
+          echo "55abc91732ab643b6f5299e815a0d3d2a4c4c15892b4f02a24fe1400c160ab3f  /tmp/rimgraph_dg_single_cell.py" | sha256sum --check
+      - name: Validate notebook shape
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('Glaucomma_RimGraphDG_Single_Cell.ipynb')
+          nb = json.loads(p.read_text())
+          assert nb['nbformat'] == 4
+          assert len(nb['cells']) == 1
+          assert nb['cells'][0]['cell_type'] == 'code'
+          print('Notebook is valid and contains exactly one code cell.')
+          PY
