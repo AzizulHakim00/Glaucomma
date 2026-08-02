@@ -1,8 +1,8 @@
-name: Validate single-cell runner
+name: Validate V4 single-cell runner
 
 on:
   push:
-    branches: [main, fix/runtime-smoke-v3]
+    branches: [main, feat/rimgraph-v4-scientific-rebuild]
   pull_request:
 
 jobs:
@@ -14,36 +14,30 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Reconstruct, patch, and syntax-check runner
+      - name: Reconstruct and compile V4 runner
         run: |
           python - <<'PY'
           from pathlib import Path
 
-          original = '\n'.join(Path(f'runner_parts/part_{i:02d}.py').read_text() for i in range(8))
-          ns_v2, ns_v3 = {}, {}
-          exec(compile(Path('runner_patch_v2.py').read_text(), 'runner_patch_v2.py', 'exec'), ns_v2, ns_v2)
-          exec(compile(Path('runner_patch_v3.py').read_text(), 'runner_patch_v3.py', 'exec'), ns_v3, ns_v3)
-          patched = ns_v2['apply_patches'](original)
-          patched = ns_v3['apply_patches_v3'](patched)
-          compile(patched, 'rimgraph_dg_single_cell_v3.py', 'exec')
-
+          code = '\n'.join(Path(f'v4_parts/part_{i:02d}.py').read_text() for i in range(7))
+          compile(code, 'rimgraph_dg_v4_single_cell.py', 'exec')
           required = [
-              'excluded_unlabelled_images.csv',
-              'missing_public_label_in_downloaded_package',
-              'weights_only=False',
-              'GPU runtime is required',
-              'completed_revision == CFG.get("code_revision")',
-              'saved_revision == current_revision',
-              'torch.set_grad_enabled(train)',
-              'l_cons_raw*b["mask_valid"]',
-              'improved = score > best_score',
+              'class GlobalBaseline',
+              'class FPNDecoder',
+              'class BalancedSourceClassBatchSampler',
+              'class RimGraphV4',
+              'cross_source_duplicate_candidates.csv',
+              'select_calibration',
+              'bootstrap_ci',
+              'scientific_diagnostic_report.md',
+              'paper_run_v4',
           ]
           for marker in required:
-              assert marker in patched, f'Missing patched safety marker: {marker}'
-          print('V3 patched runner compiled and all runtime safety markers were found.')
+              assert marker in code, f'Missing V4 marker: {marker}'
+          print('V4 runner compiled and research safety markers were found.')
           PY
 
-      - name: Validate notebook shape and immutable pin
+      - name: Validate one-cell notebook and immutable V4 pin
         run: |
           python - <<'PY'
           import json
@@ -54,12 +48,13 @@ jobs:
           assert len(nb['cells']) == 1
           assert nb['cells'][0]['cell_type'] == 'code'
           source = ''.join(nb['cells'][0]['source'])
-          assert "COMMIT = 'a2621ca580f1974b13ebb904f420f97f5461f50b'" in source
+          assert "COMMIT = '6ed15baf1ca364efd8a589b7df5146efc63068bf'" in source
+          assert "parts = [f'v4_parts/part_{i:02d}.py' for i in range(7)]" in source
           assert "code = '\\n'.join" in source
-          assert "apply_patches_v3" in source
-          assert "'run_name': 'paper_run_v3'" in source
-          assert "'code_revision': 'rimgrah-dg-runtime-v3-20260802'" in source
-          assert "'batch_size': 2" in source
+          assert "'run_name': 'paper_run_v4'" in source
+          assert "'run_global_baseline': True" in source
+          assert "'run_full_model': True" in source
+          assert "'batch_size': 4" in source
           assert "'num_workers': 0" in source
-          print('Notebook is valid, single-cell, safer for T4, and pinned to immutable v3 code.')
+          print('Notebook is one cell and pinned to immutable V4 research code.')
           PY
