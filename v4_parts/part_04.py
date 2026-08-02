@@ -173,7 +173,11 @@ def select_calibration(val_pred):
 def choose_threshold(y, p):
     if CFG["threshold_policy"] == "youden":
         fpr, tpr, thr = roc_curve(y, p)
-        return float(thr[np.argmax(tpr - fpr)])
+        finite = np.isfinite(thr)
+        if not finite.any(): return 0.5
+        finite_idx = np.where(finite)[0]
+        best = finite_idx[np.argmax((tpr - fpr)[finite_idx])]
+        return float(np.clip(thr[best], 0.0, 1.0))
     return 0.5
 
 
