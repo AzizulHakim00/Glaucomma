@@ -36,10 +36,10 @@ def merge_seg_stats(total, batch_stats):
 def final_seg_stats(total):
     out = {}
     for name in ["disc", "cup"]:
-        count = max(1.0, total[name]["count"])
-        out[f"dice_{name}"] = total[name]["dice_sum"] / count
-        out[f"iou_{name}"] = total[name]["iou_sum"] / count
-        out[f"n_mask_{name}"] = int(total[name]["count"])
+        raw_count = total[name]["count"]
+        out[f"dice_{name}"] = total[name]["dice_sum"] / raw_count if raw_count > 0 else np.nan
+        out[f"iou_{name}"] = total[name]["iou_sum"] / raw_count if raw_count > 0 else np.nan
+        out[f"n_mask_{name}"] = int(raw_count)
     return out
 
 
@@ -262,7 +262,7 @@ def train_full(target_source, seed, train_df, val_df, test_df, root_rel):
         tr = run_full_epoch(model, train_loader, optimizer, scaler, epoch, sampler)
         va = run_full_epoch(model, val_loader, None, None, epoch)
         scheduler.step()
-        score = 0.65 * np.nan_to_num(va["auroc"]) + 0.20 * np.nan_to_num(va["auprc"]) + 0.075 * va["dice_disc"] + 0.075 * va["dice_cup"]
+        score = 0.65 * np.nan_to_num(va["auroc"]) + 0.20 * np.nan_to_num(va["auprc"]) + 0.075 * np.nan_to_num(va["dice_disc"]) + 0.075 * np.nan_to_num(va["dice_cup"])
         history.append({
             "epoch": epoch, "stage": va["stage"], "train_loss": tr["loss"], "val_loss": va["loss"],
             "val_auroc": va["auroc"], "val_auprc": va["auprc"], "val_f1": va["f1"],
