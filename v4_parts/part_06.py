@@ -23,7 +23,7 @@ def tune_full_source_only(train_df, val_df, target_source, seed, root_rel):
             va = run_full_epoch(model, val_loader, None, None, ep)
             trial.report(float(np.nan_to_num(va["auroc"])), ep)
             if trial.should_prune(): raise optuna.TrialPruned()
-        score = 0.65 * np.nan_to_num(va["auroc"]) + 0.20 * np.nan_to_num(va["auprc"]) + 0.075 * va["dice_disc"] + 0.075 * va["dice_cup"]
+        score = 0.65 * np.nan_to_num(va["auroc"]) + 0.20 * np.nan_to_num(va["auprc"]) + 0.075 * np.nan_to_num(va["dice_disc"]) + 0.075 * np.nan_to_num(va["dice_cup"])
         del model; gc.collect()
         if torch.cuda.is_available(): torch.cuda.empty_cache()
         return float(score)
