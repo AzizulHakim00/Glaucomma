@@ -1,71 +1,69 @@
-# Glaucomma — RimGraph-DG
+# Glaucomma — RimGraph-DG V4
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/AzizulHakim00/Glaucomma/blob/main/Glaucomma_RimGraphDG_Single_Cell.ipynb)
 
-A reproducible Google Colab research pipeline for source-independent glaucoma screening using ORIGA, REFUGE, and G1020.
+A reproducible Google Colab research pipeline for cross-dataset glaucoma screening using ORIGA, REFUGE, and G1020.
 
-## Main design
+## Why V4
 
-- One executable Colab cell with organized live output
-- Leave-one-dataset-out external validation
-- ConvNeXt-based global/local representation
-- Optic-disc and optic-cup multi-task segmentation
-- 12-sector polar rim graph attention
-- vCDR consistency learning
-- class-conditional cross-domain prototype alignment
-- source-adversarial learning
-- optional Optuna tuning using source validation data only
-- worst-source temperature scaling
-- visual XAI, clock-sector attention, calibration and error analysis
-- automatic resume after interruption
+V4 replaces the unstable deepest-feature segmentation design with a staged, testable research pipeline:
 
-## Run in Colab
+- global classification baseline for every held-out dataset;
+- multi-scale ConvNeXt FPN with GroupNorm for optic-disc/cup segmentation;
+- high-resolution differentiable optic-disc ROI pooling;
+- 12-sector polar rim graph built from high-resolution FPN features;
+- separate validity handling for disc, cup, and vCDR annotations;
+- source/class-balanced mini-batches;
+- staged activation: global+segmentation, anatomy fusion, then graph/domain objectives;
+- cross-source perceptual-duplicate detection and fold-specific leakage removal;
+- laterality-aware canonicalization when verified eye-side metadata is available;
+- identity, standard-temperature, and robust-temperature calibration compared on source validation only;
+- bootstrap confidence intervals, calibration, XAI, baseline-versus-full comparison, and an automatic scientific diagnostic report.
 
-Click the **Open in Colab** badge above, select a GPU runtime, and run the notebook's only cell.
+## Run
 
-The cell automatically:
+Open the notebook using the badge, select a T4 GPU runtime, and run its only cell. The notebook is pinned to an immutable V4 code revision and verifies the combined runner with SHA-256 before execution.
 
-1. mounts Google Drive;
-2. finds or downloads the Kaggle dataset `arnavjain1/glaucoma-datasets`;
-3. audits labels, images and masks;
-4. runs ORIGA, REFUGE and G1020 leave-one-source-out folds;
-5. displays live epoch tables and figures;
-6. saves checkpoints, predictions, metrics, figures and manifests to both Colab and Drive.
+Default execution runs one seed for:
+
+1. held-out ORIGA;
+2. held-out REFUGE;
+3. held-out G1020;
+4. a global ConvNeXt baseline and the staged RimGraph-DG V4 model in every fold.
+
+For a quick loader/runtime check, temporarily set `fast_dev_run=True`. Smoke-test outputs are not paper results.
+
+For final multi-seed statistics after the first complete V4 run is reviewed, use:
+
+```python
+'seeds': [2029, 2030, 2031]
+```
+
+Enable `run_optuna=True` only after the untuned baseline and full V4 results are scientifically evaluated.
 
 ## Output locations
 
-- Colab: `/content/Glaucomma_runs/<run_id>/`
-- Drive: `/content/drive/MyDrive/Glaucomma_RimGraphDG/<run_id>/`
+- Colab: `/content/Glaucomma_runs/paper_run_v4/`
+- Drive: `/content/drive/MyDrive/Glaucomma_RimGraphDG/paper_run_v4/`
+- ZIP: `/content/drive/MyDrive/Glaucomma_RimGraphDG/paper_run_v4.zip`
 
-Each fold saves:
+Main outputs include:
 
-- `best_model.pt`
-- `last_checkpoint.pt`
-- `history.csv`
-- `test_predictions.csv`
-- `metrics.json`
-- calibration selection results
-- ROC, PR, confusion-matrix and calibration figures
-- segmentation/XAI examples
-- sector-attention summary
+- `dataset_audit.csv`
+- `excluded_unlabelled_images.csv`
+- `cross_source_duplicate_candidates.csv`
+- `fold_model_summary.csv`
+- `aggregate_metrics.csv`
+- `baseline_vs_full.csv`
+- `all_external_predictions.csv`
+- `scientific_diagnostic_report.md`
+- `artifact_manifest.csv`
+- split CSVs, `.pt` checkpoints, histories, calibration tables, predictions, figures, and XAI files for each source/seed/model.
 
-The complete run also saves `fold_summary.csv`, `aggregate_metrics.csv`, `all_external_predictions.csv`, an SHA-256 artifact manifest and a ZIP bundle.
+## Scientific safeguards
 
-## Important configuration
+The held-out source is never used for training, validation, early stopping, hyperparameter selection, threshold selection, or probability calibration. Unlabelled challenge images are excluded rather than assigned guessed labels. Fold-specific duplicate candidates matching the held-out source are removed from training. Missing segmentation annotations remain valid classification samples but do not receive fabricated mask or vCDR targets.
 
-At the top of the runner:
+## Validation status
 
-- set `fast_dev_run=True` only for a smoke test;
-- keep `fast_dev_run=False` for research experiments;
-- set `run_optuna=True` for source-only hyperparameter tuning;
-- optionally set `manual_data_dir` when the dataset is already stored in Drive.
-
-## Reproducibility and leakage control
-
-The held-out source is not used for fitting, early stopping, hyperparameter selection, threshold selection or temperature scaling. All split CSVs, effective hyperparameters, checkpoints, environment details and checksums are retained.
-
-The notebook is pinned to an immutable runner commit and verifies the reconstructed runner with SHA-256 before execution. GitHub Actions also checks that the runner compiles and that the notebook contains exactly one code cell.
-
-## Status
-
-This is an initial research implementation. Syntax and notebook structure are validated, but full GPU training results must be produced by running the notebook in Colab with the dataset available.
+GitHub Actions compiles the clean V4 runner and executes an end-to-end synthetic three-source experiment covering model training, segmentation, graph fusion, calibration, checkpoint save/load, and mirrored artifacts. This validates the software path, not the medical performance. Actual publication readiness depends on the resulting external metrics, segmentation quality, confidence intervals, ablations, and independent external validation.
