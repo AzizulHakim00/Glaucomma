@@ -1,8 +1,8 @@
-name: Validate V4.2 single-cell runner
+name: Validate V4.3 single-cell runner
 
 on:
   push:
-    branches: [main, fix/v42-balanced-microbatch-sampler]
+    branches: [main, fix/v43-scientific-guards]
   pull_request:
 
 jobs:
@@ -13,60 +13,52 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-      - name: Reconstruct, patch, and compile V4.2 runner
+      - name: Reconstruct and compile V4.3 runner
         run: |
           python - <<'PY'
           from pathlib import Path
-
           raw = '\n'.join(Path(f'v4_parts/part_{i:02d}.py').read_text() for i in range(7))
-          ns41, ns42 = {}, {}
-          src41 = Path('runner_patch_v41.py').read_text()
-          src42 = Path('runner_patch_v42.py').read_text()
-          exec(compile(src41, 'runner_patch_v41.py', 'exec'), ns41, ns41)
-          exec(compile(src42, 'runner_patch_v42.py', 'exec'), ns42, ns42)
-          code = ns41['apply_v41'](raw)
-          code = ns42['apply_v42'](code)
-          compile(code, 'rimgraph_dg_v42_single_cell.py', 'exec')
+          code = raw
+          for patch_name, fn_name in [
+              ('runner_patch_v41.py', 'apply_v41'),
+              ('runner_patch_v42.py', 'apply_v42'),
+              ('runner_patch_v43.py', 'apply_v43'),
+          ]:
+              ns = {}
+              src = Path(patch_name).read_text()
+              exec(compile(src, patch_name, 'exec'), ns, ns)
+              code = ns[fn_name](code)
+          compile(code, 'rimgraph_dg_v43_single_cell.py', 'exec')
           required = [
-              'class GlobalBaseline',
-              'class FPNDecoder',
-              'class BalancedSourceClassBatchSampler',
-              'class RimGraphV4',
-              'Drive write verification: PASSED',
-              'gradient_checkpointing',
-              'write_heartbeat("fold_start"',
-              'torch.cuda.ipc_collect()',
+              'Prototype-aware source/class balancing',
+              'prototype_pair_count',
+              'eligible_for_selection = va["stage"] == "full"',
+              'vertical_cup_extent / vertical_disc_extent',
+              'torch.fft.rfft(rim_vector',
+              'cup_prob = raw[:, 1:2] * disc_prob',
+              'gate_context',
               'RUN_COMPLETED.json',
-              'coverage_batches',
-              'grad_accum',
           ]
           for marker in required:
-              assert marker in code, f'Missing V4.2 marker: {marker}'
-          assert 'batch_size={self.batch_size} is smaller' not in code
-          print('V4.2 patched runner compiled and the small-microbatch sampler is active.')
+              assert marker in code, marker
+          print('RIMGRAPH_V43_PATCH_COMPILE_PASSED')
           PY
-
-      - name: Validate clean one-cell notebook and immutable V4.2 pin
+      - name: Validate clean immutable notebook
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
-
           nb = json.loads(Path('Glaucomma_RimGraphDG_Single_Cell.ipynb').read_text())
           assert nb['nbformat'] == 4
           assert len(nb['cells']) == 1
           assert nb['cells'][0]['cell_type'] == 'code'
           assert nb['cells'][0].get('outputs') == []
           source = ''.join(nb['cells'][0]['source'])
-          assert "COMMIT = 'dbf9e4492c3350800773267d9538cd47c5b2978f'" in source
-          assert 'runner_patch_v41.py' in source
-          assert 'runner_patch_v42.py' in source
-          assert "'run_name': 'paper_run_v42'" in source
-          assert "'code_revision': 'rimgraph-dg-v4.2-20260803'" in source
-          assert "'batch_size': 2" in source
-          assert "'grad_accum': 2" in source
-          assert "'gradient_checkpointing': True" in source
+          assert "COMMIT = '8e09e42687a5df20f1adbb9d332d87a60b9eb5ae'" in source
+          assert "runner_patch_v43.py" in source
+          assert "'run_name': 'paper_run_v43'" in source
+          assert "'code_revision': 'rimgraph-dg-v4.3-20260804'" in source
+          assert "'batch_size': 2" in source and "'grad_accum': 2" in source
           assert 'FAILURE_TRACEBACK.txt' in source
-          print('Notebook is clean, one cell, T4-safe, and pinned to immutable V4.2 code.')
+          print('RIMGRAPH_V43_NOTEBOOK_VALIDATION_PASSED')
           PY
