@@ -57,6 +57,7 @@ GLAUCOMMA_OVERRIDES = {
     "batch_size": 2,
     "grad_accum": 2,
     "mixed_precision": False,
+    "gradient_checkpointing": True,
     "baseline_epochs": 1,
     "full_epochs": 3,
     "seg_warmup_epochs": 1,
@@ -74,6 +75,7 @@ for patch_name, fn_name in [
     ("runner_patch_v41.py", "apply_v41"),
     ("runner_patch_v42.py", "apply_v42"),
     ("runner_patch_v43.py", "apply_v43"),
+    ("runner_patch_v43_autograd.py", "apply_v43_autograd"),
 ]:
     namespace = {}
     source = (ROOT / patch_name).read_text()
