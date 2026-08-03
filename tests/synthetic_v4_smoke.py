@@ -5,14 +5,14 @@ import pandas as pd
 import cv2
 
 ROOT = Path(__file__).resolve().parents[1]
-TMP = Path(tempfile.mkdtemp(prefix="rimgraph_v4_ci_"))
+TMP = Path(tempfile.mkdtemp(prefix="rimgraph_v42_ci_"))
 os.chdir(TMP)
 
 GLAUCOMMA_OVERRIDES = {
     "manual_data_dir": str(TMP),
     "fast_dev_run": True,
-    "run_name": "ci_v4",
-    "code_revision": "rimgraph-dg-v4-ci",
+    "run_name": "ci_v42",
+    "code_revision": "rimgraph-dg-v4.2-ci",
     "pretrained": False,
     "backbone": "resnet18",
     "backbone_fallback": "resnet18",
@@ -22,17 +22,26 @@ GLAUCOMMA_OVERRIDES = {
     "graph_hidden": 32,
     "graph_heads": 4,
     "roi_output_size": 8,
-    "batch_size": 4,
-    "grad_accum": 1,
+    "batch_size": 2,
+    "grad_accum": 2,
     "mixed_precision": False,
     "bootstrap_samples": 10,
     "num_workers": 0,
     "resume": False,
 }
 
+patch_ns = {}
+exec(
+    compile((ROOT / "runner_patch_v42.py").read_text(encoding="utf-8"), "runner_patch_v42.py", "exec"),
+    patch_ns,
+    patch_ns,
+)
+
 ns = globals()
 for part in ["part_00.py", "part_02.py", "part_03.py", "part_04.py", "part_05.py"]:
-    code = (ROOT / "v4_parts" / part).read_text()
+    code = (ROOT / "v4_parts" / part).read_text(encoding="utf-8")
+    if part == "part_02.py":
+        code = patch_ns["apply_v42"](code)
     exec(compile(code, part, "exec"), ns, ns)
 
 rows = []
@@ -77,4 +86,4 @@ assert np.isfinite(full_metrics["auroc"])
 assert (LOCAL_RUN / "folds/G1020/seed_7/global_baseline/best_model.pt").exists()
 assert (LOCAL_RUN / "folds/G1020/seed_7/rimgraph_v4/best_model.pt").exists()
 assert (DRIVE_RUN / "folds/G1020/seed_7/rimgraph_v4/test_predictions.csv").exists()
-print("RIMGRAPH_V4_END_TO_END_SMOKE_PASSED")
+print("RIMGRAPH_V42_END_TO_END_MICROBATCH_SMOKE_PASSED")
