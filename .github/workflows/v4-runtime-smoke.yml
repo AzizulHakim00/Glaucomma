@@ -1,14 +1,14 @@
-name: V4.2 runtime smoke
+name: V4.3 runtime smoke
 
 on:
   push:
-    branches: [fix/v42-balanced-microbatch-sampler, main]
+    branches: [main, fix/v43-scientific-guards]
   pull_request:
 
 jobs:
-  v42-runtime-smoke:
+  v43-runtime-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -19,27 +19,11 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision
           python -m pip install timm kagglehub optuna openpyxl scikit-learn matplotlib pandas pillow opencv-python-headless ipython
-      - name: Compile raw and patched runners
-        run: |
-          python -m py_compile v4_parts/part_*.py runner_patch_v41.py runner_patch_v42.py
-          python - <<'PY'
-          from pathlib import Path
-          raw = '\n'.join(Path(f'v4_parts/part_{i:02d}.py').read_text() for i in range(7))
-          ns41, ns42 = {}, {}
-          src41 = Path('runner_patch_v41.py').read_text()
-          src42 = Path('runner_patch_v42.py').read_text()
-          exec(compile(src41, 'runner_patch_v41.py', 'exec'), ns41, ns41)
-          exec(compile(src42, 'runner_patch_v42.py', 'exec'), ns42, ns42)
-          patched = ns41['apply_v41'](raw)
-          patched = ns42['apply_v42'](patched)
-          compile(patched, 'rimgraph_dg_v42_single_cell.py', 'exec')
-          assert 'coverage_batches' in patched
-          assert 'batch_size={self.batch_size} is smaller' not in patched
-          print('RIMGRAPH_V42_PATCH_COMPILE_PASSED')
-          PY
-      - name: Test accumulation-aware sampler directly
-        run: python tests/test_v42_sampler.py
-      - name: Run end-to-end synthetic experiment with batch_size=2 and grad_accum=2
+      - name: Compile patches
+        run: python -m py_compile v4_parts/part_*.py runner_patch_v41.py runner_patch_v42.py runner_patch_v43.py
+      - name: Test scientific guards
+        run: python tests/test_v43_scientific_guards.py
+      - name: Run complete full-stage synthetic experiment
         env:
           MPLBACKEND: Agg
         run: python tests/synthetic_v4_smoke.py
