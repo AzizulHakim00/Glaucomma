@@ -30,7 +30,7 @@ jobs:
               code = ns[fn_name](code)
           compile(code, 'rimgraph_dg_v43_single_cell.py', 'exec')
           required = [
-              'Prototype-aware source/class balancing',
+              'Prototype-aware balancing',
               'prototype_pair_count',
               'eligible_for_selection = va["stage"] == "full"',
               'vertical_cup_extent / vertical_disc_extent',
@@ -54,7 +54,7 @@ jobs:
           assert nb['cells'][0]['cell_type'] == 'code'
           assert nb['cells'][0].get('outputs') == []
           source = ''.join(nb['cells'][0]['source'])
-          assert "COMMIT = '8e09e42687a5df20f1adbb9d332d87a60b9eb5ae'" in source
+          assert "COMMIT = '5dd535544d5e5e3542a4c6f8ebccb4a47916acf0'" in source
           assert "runner_patch_v43.py" in source
           assert "'run_name': 'paper_run_v43'" in source
           assert "'code_revision': 'rimgraph-dg-v4.3-20260804'" in source
