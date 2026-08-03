@@ -12,6 +12,7 @@ for patch_name, fn_name in [
     ("runner_patch_v41.py", "apply_v41"),
     ("runner_patch_v42.py", "apply_v42"),
     ("runner_patch_v43.py", "apply_v43"),
+    ("runner_patch_v43_autograd.py", "apply_v43_autograd"),
 ]:
     ns = {}
     src = (ROOT / patch_name).read_text()
@@ -27,6 +28,7 @@ required = [
     "torch.fft.rfft(rim_vector",
     "cup_prob = raw[:, 1:2] * disc_prob",
     "gate_context",
+    "module.inplace = False",
 ]
 for marker in required:
     assert marker in code, marker
