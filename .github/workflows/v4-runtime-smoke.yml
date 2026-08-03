@@ -20,7 +20,7 @@ jobs:
           python -m pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision
           python -m pip install timm kagglehub optuna openpyxl scikit-learn matplotlib pandas pillow opencv-python-headless ipython
       - name: Compile patches
-        run: python -m py_compile v4_parts/part_*.py runner_patch_v41.py runner_patch_v42.py runner_patch_v43.py
+        run: python -m py_compile v4_parts/part_*.py runner_patch_v41.py runner_patch_v42.py runner_patch_v43.py runner_patch_v43_autograd.py
       - name: Test scientific guards
         run: python tests/test_v43_scientific_guards.py
       - name: Run complete full-stage synthetic experiment
