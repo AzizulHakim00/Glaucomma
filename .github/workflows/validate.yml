@@ -23,6 +23,7 @@ jobs:
               ('runner_patch_v41.py', 'apply_v41'),
               ('runner_patch_v42.py', 'apply_v42'),
               ('runner_patch_v43.py', 'apply_v43'),
+              ('runner_patch_v43_autograd.py', 'apply_v43_autograd'),
           ]:
               ns = {}
               src = Path(patch_name).read_text()
@@ -37,6 +38,7 @@ jobs:
               'torch.fft.rfft(rim_vector',
               'cup_prob = raw[:, 1:2] * disc_prob',
               'gate_context',
+              'module.inplace = False',
               'RUN_COMPLETED.json',
           ]
           for marker in required:
@@ -54,8 +56,9 @@ jobs:
           assert nb['cells'][0]['cell_type'] == 'code'
           assert nb['cells'][0].get('outputs') == []
           source = ''.join(nb['cells'][0]['source'])
-          assert "COMMIT = '5dd535544d5e5e3542a4c6f8ebccb4a47916acf0'" in source
+          assert "COMMIT = '76a8712b74e0a998b2b671610a2dc56ad822a811'" in source
           assert "runner_patch_v43.py" in source
+          assert "runner_patch_v43_autograd.py" in source
           assert "'run_name': 'paper_run_v43'" in source
           assert "'code_revision': 'rimgraph-dg-v4.3-20260804'" in source
           assert "'batch_size': 2" in source and "'grad_accum': 2" in source
