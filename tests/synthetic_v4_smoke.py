@@ -10,24 +10,30 @@ ROOT = Path(__file__).resolve().parents[1]
 TMP = Path(tempfile.mkdtemp(prefix="rimgraph_v43_ci_"))
 os.chdir(TMP)
 
-# Build a small but fully discoverable three-source dataset.
+# Build a small, fully discoverable dataset with deliberately different
+# source-domain geometry so duplicate protection is exercised without
+# deleting the complete training pool.
 for source_i, source in enumerate(["ORIGA", "REFUGE", "G1020"]):
     mask_dir = TMP / source / "Masks"
     mask_dir.mkdir(parents=True, exist_ok=True)
+    disc_x = 48 + (source_i - 1) * 10
+    disc_y = 47 + source_i * 2
     for label, class_name in [(0, "Normal"), (1, "Glaucoma")]:
         image_dir = TMP / source / class_name / "Images"
         image_dir.mkdir(parents=True, exist_ok=True)
         for i in range(8):
             image = np.zeros((96, 96, 3), np.uint8)
-            image[:] = (18 + source_i * 8, 20 + source_i * 6, 22 + source_i * 5)
-            cv2.circle(image, (48, 48), 39, (70 + label * 20, 80 + label * 20, 90 + label * 20), -1)
-            cv2.circle(image, (60, 48), 12 + 3 * label, (180, 160, 130), -1)
+            image[:] = (12 + source_i * 13, 18 + source_i * 9, 24 + source_i * 7)
+            cv2.circle(image, (48, 48), 39, (65 + source_i * 9 + label * 20, 78 + label * 18, 90 + source_i * 5), -1)
+            cv2.circle(image, (disc_x, disc_y), 13 + 2 * label, (185, 160 - source_i * 12, 125 + source_i * 8), -1)
+            cv2.line(image, (8, 18 + source_i * 15), (88, 26 + source_i * 11), (30 + source_i * 35, 55, 75), 2)
+            cv2.circle(image, (15 + i * 7, 78 - source_i * 6), 2, (100 + i * 5, 45, 35), -1)
             stem = f"{source}_{class_name}_{i:03d}"
             cv2.imwrite(str(image_dir / f"{stem}.png"), image)
 
             mask = np.full((96, 96), 255, np.uint8)
-            cv2.circle(mask, (60, 48), 18, 128, -1)
-            cv2.circle(mask, (60, 48), 7 + 2 * label, 0, -1)
+            cv2.circle(mask, (disc_x, disc_y), 18, 128, -1)
+            cv2.circle(mask, (disc_x, disc_y), 7 + 2 * label, 0, -1)
             cv2.imwrite(str(mask_dir / f"{stem}.png"), mask)
 
 GLAUCOMMA_OVERRIDES = {
@@ -63,9 +69,12 @@ GLAUCOMMA_OVERRIDES = {
 }
 
 raw = "\n".join((ROOT / f"v4_parts/part_{i:02d}.py").read_text() for i in range(7))
-patch_names = ["runner_patch_v41.py", "runner_patch_v42.py", "runner_patch_v43.py"]
 code = raw
-for patch_name, fn_name in zip(patch_names, ["apply_v41", "apply_v42", "apply_v43"]):
+for patch_name, fn_name in [
+    ("runner_patch_v41.py", "apply_v41"),
+    ("runner_patch_v42.py", "apply_v42"),
+    ("runner_patch_v43.py", "apply_v43"),
+]:
     namespace = {}
     source = (ROOT / patch_name).read_text()
     exec(compile(source, patch_name, "exec"), namespace, namespace)
