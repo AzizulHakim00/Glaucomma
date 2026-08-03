@@ -1,8 +1,8 @@
-name: Validate V4.1 single-cell runner
+name: Validate V4.2 single-cell runner
 
 on:
   push:
-    branches: [main, fix/v41-colab-restart-drive-memory]
+    branches: [main, fix/v42-balanced-microbatch-sampler]
   pull_request:
 
 jobs:
@@ -14,17 +14,20 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Reconstruct, patch, and compile V4.1 runner
+      - name: Reconstruct, patch, and compile V4.2 runner
         run: |
           python - <<'PY'
           from pathlib import Path
 
           raw = '\n'.join(Path(f'v4_parts/part_{i:02d}.py').read_text() for i in range(7))
-          ns = {}
-          patch_source = Path('runner_patch_v41.py').read_text()
-          exec(compile(patch_source, 'runner_patch_v41.py', 'exec'), ns, ns)
-          code = ns['apply_v41'](raw)
-          compile(code, 'rimgraph_dg_v41_single_cell.py', 'exec')
+          ns41, ns42 = {}, {}
+          src41 = Path('runner_patch_v41.py').read_text()
+          src42 = Path('runner_patch_v42.py').read_text()
+          exec(compile(src41, 'runner_patch_v41.py', 'exec'), ns41, ns41)
+          exec(compile(src42, 'runner_patch_v42.py', 'exec'), ns42, ns42)
+          code = ns41['apply_v41'](raw)
+          code = ns42['apply_v42'](code)
+          compile(code, 'rimgraph_dg_v42_single_cell.py', 'exec')
           required = [
               'class GlobalBaseline',
               'class FPNDecoder',
@@ -35,14 +38,16 @@ jobs:
               'write_heartbeat("fold_start"',
               'torch.cuda.ipc_collect()',
               'RUN_COMPLETED.json',
-              'V4.1 run completed',
+              'coverage_batches',
+              'grad_accum',
           ]
           for marker in required:
-              assert marker in code, f'Missing V4.1 marker: {marker}'
-          print('V4.1 patched runner compiled and persistence/memory markers were found.')
+              assert marker in code, f'Missing V4.2 marker: {marker}'
+          assert 'batch_size={self.batch_size} is smaller' not in code
+          print('V4.2 patched runner compiled and the small-microbatch sampler is active.')
           PY
 
-      - name: Validate clean one-cell notebook and immutable V4.1 pin
+      - name: Validate clean one-cell notebook and immutable V4.2 pin
         run: |
           python - <<'PY'
           import json
@@ -54,13 +59,14 @@ jobs:
           assert nb['cells'][0]['cell_type'] == 'code'
           assert nb['cells'][0].get('outputs') == []
           source = ''.join(nb['cells'][0]['source'])
-          assert "COMMIT = 'c84600294143e2bf7f70434ae312b109e8da07da'" in source
-          assert "runner_patch_v41.py" in source
-          assert "'run_name': 'paper_run_v41'" in source
-          assert "'code_revision': 'rimgraph-dg-v4.1-20260803'" in source
+          assert "COMMIT = 'dbf9e4492c3350800773267d9538cd47c5b2978f'" in source
+          assert 'runner_patch_v41.py' in source
+          assert 'runner_patch_v42.py' in source
+          assert "'run_name': 'paper_run_v42'" in source
+          assert "'code_revision': 'rimgraph-dg-v4.2-20260803'" in source
           assert "'batch_size': 2" in source
           assert "'grad_accum': 2" in source
           assert "'gradient_checkpointing': True" in source
           assert 'FAILURE_TRACEBACK.txt' in source
-          print('Notebook is clean, one cell, T4-safe, and pinned to immutable V4.1 code.')
+          print('Notebook is clean, one cell, T4-safe, and pinned to immutable V4.2 code.')
           PY
