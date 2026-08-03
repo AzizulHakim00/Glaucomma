@@ -20,7 +20,7 @@ for patch_name, fn_name in [
 
 compile(code, "rimgraph_dg_v43.py", "exec")
 required = [
-    "Prototype-aware source/class balancing",
+    "Prototype-aware balancing",
     "prototype_pair_count",
     "eligible_for_selection = va[\"stage\"] == \"full\"",
     "vertical_cup_extent / vertical_disc_extent",
