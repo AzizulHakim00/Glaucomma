@@ -1,12 +1,12 @@
-name: V4.3 runtime smoke
+name: V4.4 runtime smoke
 
 on:
   push:
-    branches: [main, fix/v43-scientific-guards]
+    branches: [main, fix/v43-scientific-guards, fix/v44-colab-runtime-guards]
   pull_request:
 
 jobs:
-  v43-runtime-smoke:
+  v44-runtime-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -20,10 +20,10 @@ jobs:
           python -m pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision
           python -m pip install timm kagglehub optuna openpyxl scikit-learn matplotlib pandas pillow opencv-python-headless ipython
       - name: Compile patches
-        run: python -m py_compile v4_parts/part_*.py runner_patch_v41.py runner_patch_v42.py runner_patch_v43.py runner_patch_v43_autograd.py
+        run: python -m py_compile v4_parts/part_*.py runner_patch_v41.py runner_patch_v42.py runner_patch_v43.py runner_patch_v43_autograd.py runner_patch_v44_runtime.py
       - name: Test scientific guards
         run: python tests/test_v43_scientific_guards.py
-      - name: Run complete full-stage synthetic experiment
+      - name: Run complete V4.4 full-stage synthetic experiment
         env:
           MPLBACKEND: Agg
         run: python tests/synthetic_v4_smoke.py
