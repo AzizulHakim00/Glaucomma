@@ -29,7 +29,6 @@ def _replace_in_block(text: str, old: str, new: str, label: str) -> str:
 
 
 def apply_v44_runtime(code: str) -> str:
-    # Make the actually connected accelerator unmistakable before long work.
     code = _once(
         code,
         'write_heartbeat("startup_complete", device=str(DEVICE))\n',
@@ -46,7 +45,6 @@ print("==============================\\n", flush=True)
         "startup heartbeat",
     )
 
-    # Report exact model load attempts around Hugging Face/timm.
     backbone_old = '''            model = timm.create_model(name, pretrained=CFG["pretrained"], features_only=True)
             if CFG.get("gradient_checkpointing", True) and hasattr(model, "set_grad_checkpointing"):
                 # Re-entrant checkpointing recomputes activations during backward.
@@ -64,7 +62,6 @@ print("==============================\\n", flush=True)
     backbone_new = '''            print(f"[BACKBONE] loading {name} pretrained={CFG['pretrained']} ...", flush=True)
             model = timm.create_model(name, pretrained=CFG["pretrained"], features_only=True)
             if CFG.get("gradient_checkpointing", True) and hasattr(model, "set_grad_checkpointing"):
-                # Keep activation checkpointing, but prevent mutation of saved tensors.
                 for module in model.modules():
                     if hasattr(module, "inplace"):
                         try:
@@ -77,7 +74,6 @@ print("==============================\\n", flush=True)
 '''
     code = _once(code, backbone_old, backbone_new, "backbone creation")
 
-    # Baseline epoch visibility.
     a, b, fn = _extract(code, 'def run_baseline_epoch(', '\n\ndef run_full_epoch', "baseline epoch")
     fn = _replace_in_block(
         fn,
@@ -99,12 +95,11 @@ print("==============================\\n", flush=True)
     )
     code = code[:a] + fn + code[b:]
 
-    # Full-model epoch visibility including warm-up/full stage transitions.
     a, b, fn = _extract(code, 'def run_full_epoch(', '\n\n@torch.no_grad()\ndef predict_baseline', "full epoch")
     fn = _replace_in_block(
         fn,
         '    stage = full_stage(epoch)\n',
-        '    stage = full_stage(epoch)\n    if train:\n        print(f"[RIMGRAPH] epoch {epoch}/{CFG[\'full_epochs\']} start | stage={stage} | batches={len(loader)}", flush=True)\n        write_heartbeat("rimgraph_epoch_start", epoch=int(epoch), stage=str(stage), batches=int(len(loader)))\n',
+        '    stage = full_stage(epoch)\n    if train:\n        print(f"[RIMGRAPH] epoch {epoch}/{CFG[\'full_epochs\']} start | stage={stage} | batches={len(loader)}", flush=True)\n        write_heartbeat("rimgraph_epoch_start", epoch=int(epoch), model_stage=str(stage), batches=int(len(loader)))\n',
         "full epoch start",
     )
     fn = _replace_in_block(
@@ -121,13 +116,12 @@ print("==============================\\n", flush=True)
         proto = metrics["prototype_active_batch_ratio"]
         proto_text = "n/a" if np.isnan(proto) else f"{proto:.3f}"
         print(f"[RIMGRAPH] epoch {epoch} done | stage={stage} loss={metrics['loss']:.4f} auroc={metrics['auroc']:.4f} auprc={metrics['auprc']:.4f} disc_dice={metrics['dice_disc']:.4f} cup_dice={metrics['dice_cup']:.4f} proto_active={proto_text}", flush=True)
-        write_heartbeat("rimgraph_epoch_complete", epoch=int(epoch), stage=str(stage), loss=float(metrics["loss"]), auroc=float(np.nan_to_num(metrics["auroc"])), auprc=float(np.nan_to_num(metrics["auprc"])), prototype_active_batch_ratio=None if np.isnan(proto) else float(proto))
+        write_heartbeat("rimgraph_epoch_complete", epoch=int(epoch), model_stage=str(stage), loss=float(metrics["loss"]), auroc=float(np.nan_to_num(metrics["auroc"])), auprc=float(np.nan_to_num(metrics["auprc"])), prototype_active_batch_ratio=None if np.isnan(proto) else float(proto))
 ''',
         "full epoch completion",
     )
     code = code[:a] + fn + code[b:]
 
-    # Real forward/backward on the full architecture BEFORE the long experiment.
     preflight = '''def _v44_gpu_model_preflight():
     print("[PREFLIGHT] constructing full RimGraph model ...", flush=True)
     write_heartbeat("gpu_model_preflight_start")
@@ -159,7 +153,6 @@ ALL_METRICS, ALL_PREDS = [], []
 '''
     code = _once(code, 'ALL_METRICS, ALL_PREDS = [], []\n', preflight, "GPU model preflight")
 
-    # Keep all progress on screen at success; do not erase useful evidence.
     code = _once(
         code,
         'clear_output(wait=True)\ndisplay(Markdown("# ✅ RimGraph-DG V4.1 run completed"))\n',
