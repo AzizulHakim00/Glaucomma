@@ -7,7 +7,7 @@ import cv2
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
-TMP = Path(tempfile.mkdtemp(prefix="rimgraph_v43_ci_"))
+TMP = Path(tempfile.mkdtemp(prefix="rimgraph_v44_ci_"))
 os.chdir(TMP)
 
 # Build a small, fully discoverable dataset with deliberately different
@@ -40,8 +40,8 @@ GLAUCOMMA_OVERRIDES = {
     "manual_data_dir": str(TMP),
     "sources": ["ORIGA", "REFUGE", "G1020"],
     "fold_targets": ["G1020"],
-    "run_name": "ci_v43",
-    "code_revision": "rimgraph-dg-v4.3-ci",
+    "run_name": "ci_v44",
+    "code_revision": "rimgraph-dg-v4.4-ci",
     "seeds": [7],
     "fast_dev_run": False,
     "resume": False,
@@ -76,13 +76,14 @@ for patch_name, fn_name in [
     ("runner_patch_v42.py", "apply_v42"),
     ("runner_patch_v43.py", "apply_v43"),
     ("runner_patch_v43_autograd.py", "apply_v43_autograd"),
+    ("runner_patch_v44_runtime.py", "apply_v44_runtime"),
 ]:
     namespace = {}
     source = (ROOT / patch_name).read_text()
     exec(compile(source, patch_name, "exec"), namespace, namespace)
     code = namespace[fn_name](code)
 
-compile(code, "rimgraph_dg_v43_ci.py", "exec")
+compile(code, "rimgraph_dg_v44_ci.py", "exec")
 exec(code, globals(), globals())
 
 metrics_path = LOCAL_RUN / "folds/G1020/seed_7/rimgraph_v4/metrics.json"
@@ -95,4 +96,4 @@ assert (LOCAL_RUN / "folds/G1020/seed_7/global_baseline/best_model.pt").exists()
 assert (LOCAL_RUN / "folds/G1020/seed_7/rimgraph_v4/best_model.pt").exists()
 assert (DRIVE_RUN / "folds/G1020/seed_7/rimgraph_v4/test_predictions.csv").exists()
 assert (LOCAL_RUN / "RUN_COMPLETED.json").exists()
-print("RIMGRAPH_V43_FULL_STAGE_END_TO_END_PASSED")
+print("RIMGRAPH_V44_FULL_STAGE_END_TO_END_PASSED")
