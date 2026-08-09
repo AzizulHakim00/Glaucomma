@@ -20,11 +20,15 @@ jobs:
           python -m pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision
           python -m pip install timm kagglehub optuna openpyxl scikit-learn matplotlib pandas pillow opencv-python-headless ipython
       - name: Compile patches
-        run: python -m py_compile v4_parts/part_*.py runner_patch_v41.py runner_patch_v42.py runner_patch_v43.py runner_patch_v43_autograd.py runner_patch_v44_runtime.py runner_patch_v45_masks.py runner_patch_v45_lowlabels.py
+        run: python -m py_compile v4_parts/part_*.py runner_patch_v41.py runner_patch_v42.py runner_patch_v43.py runner_patch_v43_autograd.py runner_patch_v44_runtime.py runner_patch_v45_masks.py runner_patch_v45_lowlabels.py runner_patch_v45_audit_only.py
       - name: Test scientific guards
         run: python tests/test_v43_scientific_guards.py
       - name: Test compact 0/1/2 mask decoding
         run: python tests/test_v45_low_label_masks.py
+      - name: Test CPU-only mask audit mode
+        env:
+          MPLBACKEND: Agg
+        run: python tests/test_v45_cpu_audit_only.py
       - name: Run complete V4.5 mask-audited full-stage synthetic experiment
         env:
           MPLBACKEND: Agg
