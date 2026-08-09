@@ -69,7 +69,9 @@ for patch_name, fn_name in [
     exec(compile(source, patch_name, "exec"), ns, ns)
     code = ns[fn_name](code)
 
-assert "_v44_gpu_model_preflight()" not in code
+# The helper definition may remain, but the executable preflight call and
+# all training loops must be absent from audit-only code.
+assert "\n_v44_gpu_model_preflight()\n" not in code
 assert "for seed in CFG[\"seeds\"]" not in code
 compile(code, "rimgraph_v45_cpu_audit_ci.py", "exec")
 exec(code, globals(), globals())
