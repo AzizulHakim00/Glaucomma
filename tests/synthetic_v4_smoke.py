@@ -5,14 +5,16 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
-TMP = Path(tempfile.mkdtemp(prefix="rimgraph_v44_ci_"))
+TMP = Path(tempfile.mkdtemp(prefix="rimgraph_v45_ci_"))
 os.chdir(TMP)
 
-# Build a small, fully discoverable dataset with deliberately different
-# source-domain geometry so duplicate protection is exercised without
-# deleting the complete training pool.
+# Build a small, fully discoverable dataset with multiple real-world mask
+# conventions. ORIGA uses black-bg/grey-disc/white-cup; REFUGE uses its
+# canonical 255-bg/128-disc/0-cup labels; G1020 includes legitimate missing
+# cups in 25% of samples while retaining a valid disc mask.
 for source_i, source in enumerate(["ORIGA", "REFUGE", "G1020"]):
     mask_dir = TMP / source / "Masks"
     mask_dir.mkdir(parents=True, exist_ok=True)
@@ -31,20 +33,28 @@ for source_i, source in enumerate(["ORIGA", "REFUGE", "G1020"]):
             stem = f"{source}_{class_name}_{i:03d}"
             cv2.imwrite(str(image_dir / f"{stem}.png"), image)
 
-            mask = np.full((96, 96), 255, np.uint8)
-            cv2.circle(mask, (disc_x, disc_y), 18, 128, -1)
-            cv2.circle(mask, (disc_x, disc_y), 7 + 2 * label, 0, -1)
+            if source == "REFUGE":
+                mask = np.full((96, 96), 255, np.uint8)
+                cv2.circle(mask, (disc_x, disc_y), 18, 128, -1)
+                cv2.circle(mask, (disc_x, disc_y), 7 + 2 * label, 0, -1)
+            else:
+                mask = np.zeros((96, 96), np.uint8)
+                cv2.circle(mask, (disc_x, disc_y), 18, 128, -1)
+                missing_g1020_cup = source == "G1020" and i < 2
+                if not missing_g1020_cup:
+                    cv2.circle(mask, (disc_x, disc_y), 7 + 2 * label, 255, -1)
             cv2.imwrite(str(mask_dir / f"{stem}.png"), mask)
 
 GLAUCOMMA_OVERRIDES = {
     "manual_data_dir": str(TMP),
     "sources": ["ORIGA", "REFUGE", "G1020"],
     "fold_targets": ["G1020"],
-    "run_name": "ci_v44",
-    "code_revision": "rimgraph-dg-v4.4-ci",
+    "run_name": "ci_v45",
+    "code_revision": "rimgraph-dg-v4.5-ci",
     "seeds": [7],
     "fast_dev_run": False,
     "resume": False,
+    "baseline_reuse_run": "",
     "pretrained": False,
     "backbone": "resnet18",
     "backbone_fallback": "resnet18",
@@ -77,14 +87,25 @@ for patch_name, fn_name in [
     ("runner_patch_v43.py", "apply_v43"),
     ("runner_patch_v43_autograd.py", "apply_v43_autograd"),
     ("runner_patch_v44_runtime.py", "apply_v44_runtime"),
+    ("runner_patch_v45_masks.py", "apply_v45_masks"),
 ]:
     namespace = {}
     source = (ROOT / patch_name).read_text()
     exec(compile(source, patch_name, "exec"), namespace, namespace)
     code = namespace[fn_name](code)
 
-compile(code, "rimgraph_dg_v44_ci.py", "exec")
+compile(code, "rimgraph_dg_v45_ci.py", "exec")
 exec(code, globals(), globals())
+
+audit_path = LOCAL_RUN / "mask_validity_by_source.csv"
+assert audit_path.exists()
+audit = pd.read_csv(audit_path).set_index("source")
+assert audit.loc["ORIGA", "disc_valid_rate"] == 1.0
+assert audit.loc["ORIGA", "cup_valid_rate"] == 1.0
+assert audit.loc["REFUGE", "disc_valid_rate"] == 1.0
+assert audit.loc["REFUGE", "cup_valid_rate"] == 1.0
+assert audit.loc["G1020", "disc_valid_rate"] == 1.0
+assert audit.loc["G1020", "cup_valid_rate"] == 0.75
 
 metrics_path = LOCAL_RUN / "folds/G1020/seed_7/rimgraph_v4/metrics.json"
 history_path = LOCAL_RUN / "folds/G1020/seed_7/rimgraph_v4/history.csv"
@@ -92,8 +113,12 @@ assert metrics_path.exists() and history_path.exists()
 metrics = json.loads(metrics_path.read_text())
 assert int(metrics["best_epoch"]) >= 3, metrics
 assert metrics["model_type"] == "rimgraph_v4"
+assert int(metrics["n_mask_disc"]) > 0
+assert int(metrics["n_mask_cup"]) > 0
+assert np.isfinite(float(metrics["dice_disc"]))
+assert np.isfinite(float(metrics["dice_cup"]))
 assert (LOCAL_RUN / "folds/G1020/seed_7/global_baseline/best_model.pt").exists()
 assert (LOCAL_RUN / "folds/G1020/seed_7/rimgraph_v4/best_model.pt").exists()
 assert (DRIVE_RUN / "folds/G1020/seed_7/rimgraph_v4/test_predictions.csv").exists()
 assert (LOCAL_RUN / "RUN_COMPLETED.json").exists()
-print("RIMGRAPH_V44_FULL_STAGE_END_TO_END_PASSED")
+print("RIMGRAPH_V45_MASK_AUDIT_AND_FULL_STAGE_END_TO_END_PASSED")
