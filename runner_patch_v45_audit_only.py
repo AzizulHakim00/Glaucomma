@@ -1,8 +1,9 @@
 """CPU-only audit patch for RimGraph-DG V4.5.
 
 This mode is intentionally non-training. It permits a CPU Colab runtime,
-runs the full dataset discovery + decoded OD/OC validity audit, persists the
-audit artifacts, and exits before any model/backbone construction.
+runs dataset discovery + decoded OD/OC validity audit, persists the audit
+artifacts, and exits before any model/backbone construction. RGB duplicate
+fingerprinting is skipped because it is unrelated to mask validity.
 """
 
 
@@ -23,6 +24,10 @@ def apply_v45_audit_only(code: str) -> str:
     print("[AUDIT ONLY] CPU Colab runtime accepted; no model training will run.", flush=True)
 '''
     code = _replace_once(code, gpu_guard, cpu_ok, "Colab GPU guard")
+
+    fingerprint = '    meta["fingerprint"] = [image_fingerprint(p) for p in meta.image_path]\n'
+    fingerprint_skip = '    meta["fingerprint"] = None\n    print("[AUDIT ONLY] Skipping RGB duplicate fingerprinting; not required for mask validity.", flush=True)\n'
+    code = _replace_once(code, fingerprint, fingerprint_skip, "RGB fingerprinting")
 
     marker = 'MASK_VALIDITY = validate_decoded_masks()\n'
     pos = code.find(marker)
