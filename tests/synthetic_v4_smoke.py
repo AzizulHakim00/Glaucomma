@@ -13,8 +13,8 @@ os.chdir(TMP)
 
 # Build a small, fully discoverable dataset with multiple real-world mask
 # conventions. ORIGA uses black-bg/grey-disc/white-cup; REFUGE uses its
-# canonical 255-bg/128-disc/0-cup labels; G1020 includes legitimate missing
-# cups in 25% of samples while retaining a valid disc mask.
+# canonical 255-bg/128-disc/0-cup labels; G1020 uses compact 0/1/2 labels and
+# includes legitimate missing cups in 25% of samples while retaining OD.
 for source_i, source in enumerate(["ORIGA", "REFUGE", "G1020"]):
     mask_dir = TMP / source / "Masks"
     mask_dir.mkdir(parents=True, exist_ok=True)
@@ -37,12 +37,16 @@ for source_i, source in enumerate(["ORIGA", "REFUGE", "G1020"]):
                 mask = np.full((96, 96), 255, np.uint8)
                 cv2.circle(mask, (disc_x, disc_y), 18, 128, -1)
                 cv2.circle(mask, (disc_x, disc_y), 7 + 2 * label, 0, -1)
+            elif source == "G1020":
+                mask = np.zeros((96, 96), np.uint8)
+                cv2.circle(mask, (disc_x, disc_y), 18, 1, -1)
+                missing_cup = i < 2
+                if not missing_cup:
+                    cv2.circle(mask, (disc_x, disc_y), 7 + 2 * label, 2, -1)
             else:
                 mask = np.zeros((96, 96), np.uint8)
                 cv2.circle(mask, (disc_x, disc_y), 18, 128, -1)
-                missing_g1020_cup = source == "G1020" and i < 2
-                if not missing_g1020_cup:
-                    cv2.circle(mask, (disc_x, disc_y), 7 + 2 * label, 255, -1)
+                cv2.circle(mask, (disc_x, disc_y), 7 + 2 * label, 255, -1)
             cv2.imwrite(str(mask_dir / f"{stem}.png"), mask)
 
 GLAUCOMMA_OVERRIDES = {
@@ -88,6 +92,7 @@ for patch_name, fn_name in [
     ("runner_patch_v43_autograd.py", "apply_v43_autograd"),
     ("runner_patch_v44_runtime.py", "apply_v44_runtime"),
     ("runner_patch_v45_masks.py", "apply_v45_masks"),
+    ("runner_patch_v45_lowlabels.py", "apply_v45_lowlabels"),
 ]:
     namespace = {}
     source = (ROOT / patch_name).read_text()
